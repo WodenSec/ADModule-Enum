@@ -11,3 +11,4 @@ Script to enumerate an Active Directory for exploitation vectors using strictly 
 - Generate obfuscated version
 - Add more GUID mapping
 - Improve README
+- Integrate AD Management DLL in the script
