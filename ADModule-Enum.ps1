@@ -17,6 +17,31 @@ $guidMapping = @{
     # Need to add more mappings
 }
 
+function Check-ADModule {
+    # Check if an AD command is available
+    if (Get-Command Get-ADUser -ErrorAction SilentlyContinue) {
+        Write-Green "[+] Active Directory module is available."
+    } else {
+        Write-Yellow "[*] AD module not found. Attempting to import Microsoft.ActiveDirectory.Management.dll..."
+        
+        # Attempt to import the DLL from the current directory
+        $dllPath = Join-Path -Path (Get-Location) -ChildPath "Microsoft.ActiveDirectory.Management.dll"
+        if (Test-Path $dllPath) {
+            try {
+                Import-Module $dllPath
+                Write-Green "[+] Successfully imported Microsoft.ActiveDirectory.Management.dll."
+            } catch {
+                Write-Red "[-] Failed to import Microsoft.ActiveDirectory.Management.dll. AD commands are unavailable."
+                exit 1
+            }
+        } else {
+            Write-Red "[-] Microsoft.ActiveDirectory.Management.dll not found in the current directory. AD commands are unavailable."
+            exit 1
+        }
+    }
+}
+Check-ADModule
+
 ########################################
 #                                      #
 #    Utility Functions Declaration     #
