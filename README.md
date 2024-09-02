@@ -21,7 +21,7 @@ Start-Transcript -Path .\ADEnum.txt ; .\ADModule-Enum.ps1 ; Stop-Transcript
 - [x] Improve output's readability
 - [ ] Add more GUID mapping
 - [ ] Improve README
-- [ ] Integrate AD Management DLL import in the script
+- [x] Integrate AD Management DLL import in the script
 - [x] Add gMSA enumeration
 - [x] Add password policy (including fine-grained) enumeration
 - [ ] Add LAPS enumeration
