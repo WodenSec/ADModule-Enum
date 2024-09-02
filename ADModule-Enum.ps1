@@ -13,6 +13,7 @@ $domainSID = (Get-ADDomain).DomainSID.Value
 $guidMapping = @{
     "ab721a53-1e2f-11d0-9819-00aa0040529b" = "User-Change-Password"
     "bf967a68-0de6-11d0-a285-00aa003049e2" = "User-Account-Control"
+    "00000000-0000-0000-0000-000000000000" = "All"
     # Need to add more mappings
 }
 
@@ -65,16 +66,6 @@ function Format-Output {
         }
     }
 }
-
-
-function Write-Red {
-    param (
-        [string]$message
-    )
-    Write-Host $message -ForegroundColor Red
-}
-
-
 
 # Function to get group membership recursively
 function Get-ADPrincipalGroupMembershipRecursive {
@@ -290,10 +281,17 @@ function Get-ADUsersInformation {
     Write-Yellow "[*] Fetching AD Users Information..."
 
     Write-Green "[*] All users (for password spray):"
-    Get-ADUser -Filter * | Select SamAccountName | Format-List | Out-String | Format-Output -AddSeparators $false | Write-Host
+    (Get-ADUser -Filter * | Select SamAccountName).samAccountName | Format-List | Out-String | Format-Output -AddSeparators $false | Write-Host
 
     Write-Green "[*] Users with description (look for passwords):"
     Get-ADUser -Filter * -Properties Description | Where-Object { $_.Description } | Select SamAccountName, Description, Enabled | Format-List | Out-String | Format-Output | Write-Host
+
+    Write-Green "[*] Users with non-expiring passwords:"
+    Get-ADUser -Filter {PasswordNeverExpires -eq $true} -Properties * | Select SamAccountName, Name, PasswordLastSet, Enabled | Format-List | Out-String | Format-Output | Write-Host
+
+    Write-Green "[*] Users with 'Password Not Required' set:"
+    Get-ADUser -Filter {userAccountControl -band 0x20} -Properties * |  Select SamAccountName, Name, PasswordLastSet, Enabled |  Format-List | Out-String | Format-Output | Write-Host
+
 }
 
 
@@ -314,8 +312,6 @@ function Get-ADAdminInformation {
     $domainAdminDN = (Get-ADGroup -Filter "SID -eq '$domainSID-512'").DistinguishedName
     Get-GroupMembersRecursive -groupDN $domainAdminDN | Format-List | Out-String | Format-Output | Write-Host
 }
-
-
 
 ########################################
 #                                      #
@@ -345,6 +341,55 @@ function Get-KerberosEnumeration {
 
 ########################################
 #                                      #
+#           Password Policy            #
+#                                      #
+########################################
+
+function Get-PasswordPolicy {
+    Write-Cyan "[*] Starting Password Policy Checkup."
+
+    Write-Green "[+] Default Domain Password Policy:"
+    Get-ADDefaultDomainPasswordPolicy | Format-List | Out-String | Format-Output -AddSeparators $false | Write-Host
+
+    Write-Green "[+] Fine-Grained Password Policies:"
+    Get-ADFineGrainedPasswordPolicy -Filter *  | Format-List | Out-String | Format-Output | Write-Host
+
+    Write-Green "[+] Fine-Grained Password Policy Subjects:"
+    Get-ADFineGrainedPasswordPolicy -Filter * | ForEach-Object {
+        Write-Yellow "[*] Policy: $($_.Name)"
+        $subjects = Get-ADFineGrainedPasswordPolicySubject -Identity $_.Name | Format-List | Out-String | Format-Output -AddSeparators $false
+        Write-Host $subjects
+
+        # Process each subject (group) to enumerate members recursively
+        $subjectObjects = Get-ADFineGrainedPasswordPolicySubject -Identity $_.Name
+        foreach ($subject in $subjectObjects) {
+            $identityClass = Get-IdentityReferenceClass -identityReference $subject.SamAccountName
+
+            if ($identityClass -eq "group") {
+                Write-Yellow "[*] Enumerating members of group: $($subject.SamAccountName)"
+                Get-GroupMembersRecursive -groupDN $subject.DistinguishedName | Format-List | Out-String | Format-Output | Write-Host
+            }
+        }
+    }
+}
+
+
+########################################
+#                                      #
+#                gMSA                  #
+#                                      #
+########################################
+
+function Get-gMSA {
+    Write-Cyan "[*] Retrieving gMSAs (Group Managed Service Accounts) Information."
+    Write-Yellow "[*] Fetching gMSAs details from Active Directory..."
+
+    Get-ADServiceAccount -Filter * -Properties * | Select Name, DistinguishedName, SamAccountName, Enabled, PrincipalsAllowedToRetrieveManagedPassword | Format-List | Out-String | Format-Output | Write-Host
+}
+
+
+########################################
+#                                      #
 #           Run All Checks             #
 #                                      #
 ########################################
@@ -355,6 +400,8 @@ function Run-AllChecks {
     Get-ADUsersInformation
     Get-ADAdminInformation
     Get-KerberosEnumeration
+    Get-PasswordPolicy
+    Get-gMSA
 }
 
 ########################################
@@ -370,8 +417,10 @@ function Show-MainMenu {
     Write-Host "3. AD Users Information"
     Write-Host "4. AD Admin Information"
     Write-Host "5. Kerberos Enumeration"
-    Write-Host "6. Run All Checks (except Targeted Enumeration)"
-    $choice = Read-Host "Enter your choice (1/2/3/4/5/6)"
+    Write-Host "6. Password Policy"
+    Write-Host "7. Retrieve gMSAs Information"
+    Write-Host "8. Run All Checks (except Targeted Enumeration)"
+    $choice = Read-Host "Enter your choice (1/2/3/4/5/6/7/8)"
     return $choice
 }
 
@@ -394,6 +443,12 @@ switch ($mainChoice) {
         Get-KerberosEnumeration
     }
     6 {
+        Get-PasswordPolicy
+    }
+    7 {
+        Get-gMSA
+    }
+    8 {
         Run-AllChecks
     }
     default {
