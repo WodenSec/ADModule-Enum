@@ -3,8 +3,7 @@ Script to enumerate an Active Directory for exploitation vectors using strictly 
 
 ## Installation
 - Follow the steps to import ADModule : https://github.com/samratashok/ADModule
-- Run the script
-- Choose which task to do
+- The DLL is included in this repository
 
 ## Usage
 Download the script and run it:
@@ -22,7 +21,7 @@ Start-Transcript -Path .\ADEnum.txt ; .\ADModule-Enum.ps1 ; Stop-Transcript
 - [x] Improve output's readability
 - [ ] Add more GUID mapping
 - [ ] Improve README
-- [ ] Integrate AD Management DLL in the script (?)
+- [ ] Integrate AD Management DLL import in the script
 - [x] Add gMSA enumeration
 - [x] Add password policy (including fine-grained) enumeration
 - [ ] Add LAPS enumeration
