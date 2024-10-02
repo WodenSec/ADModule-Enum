@@ -3,18 +3,30 @@
 #            Initialization            #
 #                                      #
 ########################################
-
-# Get current user and domain
-$currentUser = $env:USERNAME
-$currentDomain = $env:USERDNSDOMAIN
-$domainSID = (Get-ADDomain).DomainSID.Value
-
-# Mapping of GUIDs to permissions
-$guidMapping = @{
-    "ab721a53-1e2f-11d0-9819-00aa0040529b" = "User-Change-Password"
-    "bf967a68-0de6-11d0-a285-00aa003049e2" = "User-Account-Control"
-    "00000000-0000-0000-0000-000000000000" = "All"
-    # Need to add more mappings
+# Unicorn puke (<3 Dewalt)
+function Write-Cyan {
+    param (
+        [string]$message
+    )
+    Write-Host -ForegroundColor Cyan $message
+}
+function Write-Yellow {
+    param (
+        [string]$message
+    )
+    Write-Host -ForegroundColor Yellow $message
+}
+function Write-Green {
+    param (
+        [string]$message
+    )
+    Write-Host -ForegroundColor Green $message
+}
+function Write-Red {
+    param (
+        [string]$message
+    )
+    Write-Host -ForegroundColor Red $message
 }
 
 function Check-ADModule {
@@ -42,37 +54,24 @@ function Check-ADModule {
 }
 Check-ADModule
 
+# Get current user and domain
+$currentUser = $env:USERNAME
+$currentDomain = $env:USERDNSDOMAIN
+$domainSID = (Get-ADDomain).DomainSID.Value
+
+# Mapping of GUIDs to permissions
+$guidMapping = @{
+    "ab721a53-1e2f-11d0-9819-00aa0040529b" = "User-Change-Password"
+    "bf967a68-0de6-11d0-a285-00aa003049e2" = "User-Account-Control"
+    "00000000-0000-0000-0000-000000000000" = "All"
+    # Need to add more mappings
+}
+
 ########################################
 #                                      #
 #    Utility Functions Declaration     #
 #                                      #
 ########################################
-
-# Unicorn puke (<3 Dewalt)
-function Write-Cyan {
-    param (
-        [string]$message
-    )
-    Write-Host -ForegroundColor Cyan $message
-}
-function Write-Yellow {
-    param (
-        [string]$message
-    )
-    Write-Host -ForegroundColor Yellow $message
-}
-function Write-Green {
-    param (
-        [string]$message
-    )
-    Write-Host -ForegroundColor Green $message
-}
-function Write-Red {
-    param (
-        [string]$message
-    )
-    Write-Host -ForegroundColor Red $message
-}
 
 # Output formatting to remove unnecessary line breaks
 function Format-Output {
