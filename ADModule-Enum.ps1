@@ -3,6 +3,7 @@
 #            Initialization            #
 #                                      #
 ########################################
+
 # Unicorn puke (<3 Dewalt)
 function Write-Cyan {
     param (
@@ -29,35 +30,55 @@ function Write-Red {
     Write-Host -ForegroundColor Red $message
 }
 
+# Checking if AD Module is already imported
 function Check-ADModule {
-    # Check if an AD command is available
     if (Get-Command Get-ADUser -ErrorAction SilentlyContinue) {
         Write-Green "[+] Active Directory module is available."
     } else {
-        Write-Yellow "[*] AD module not found. Attempting to import Microsoft.ActiveDirectory.Management.dll..."
-        
-        # Attempt to import the DLL from the current directory
+        Write-Yellow "[*] AD module not found. Attempting to import..."
         $dllPath = Join-Path -Path (Get-Location) -ChildPath "Microsoft.ActiveDirectory.Management.dll"
-        if (Test-Path $dllPath) {
+        $psd1Path = Join-Path -Path (Get-Location) -ChildPath "ActiveDirectory\ActiveDirectory.psd1"
+
+        if ((Test-Path $dllPath) -and (Test-Path $psd1Path)) {
             try {
                 Import-Module $dllPath
-                Write-Green "[+] Successfully imported Microsoft.ActiveDirectory.Management.dll."
+                Import-Module $psd1Path
+                Write-Green "[+] Successfully imported AD Module."
             } catch {
-                Write-Red "[-] Failed to import Microsoft.ActiveDirectory.Management.dll. AD commands are unavailable."
+                Write-Red "[-] Failed to import the required files. Perhaps run powershell -ep bypass ?"
+                exit 1
+            }
+            # Check if AD commands are now available
+            if (Get-Command Get-ADUser -ErrorAction SilentlyContinue) {
+                Write-Green "[+] Active Directory module is now available."
+            } else {
+                Write-Red "[-] AD commands are still unavailable despite successful import."
                 exit 1
             }
         } else {
-            Write-Red "[-] Microsoft.ActiveDirectory.Management.dll not found in the current directory. AD commands are unavailable."
+            Write-Red "[-] Microsoft.ActiveDirectory.Management.dll and/or ActiveDirectory.psd1 not found."
             exit 1
         }
     }
 }
 Check-ADModule
 
+
 # Get current user and domain
 $currentUser = $env:USERNAME
 $currentDomain = $env:USERDNSDOMAIN
+
+if (-not $currentDomain) {
+    # Double-checking if we're not part of a domain
+    $currentDomain = (Get-ADDomain).DNSRoot
+    if (-not $currentDomain) {
+        Write-Red "[-] This system is not part of a domain. Exiting."
+        exit 1
+    }
+}
+
 $domainSID = (Get-ADDomain).DomainSID.Value
+
 
 # Mapping of GUIDs to permissions
 $guidMapping = @{
@@ -133,10 +154,10 @@ function Validate-User {
     )
     try {
         $user = Get-ADUser -Identity $username -ErrorAction Stop
-        Write-Green "[+] User $username found in AD."
+        Write-Green "[+] User $username found in domain."
         return $true
     } catch {
-        Write-Red "[-] User $username does not exist in AD."
+        Write-Red "[-] User $username does not exist in domain. Perhaps it's a local user ?"
         return $false
     }
 }
@@ -164,9 +185,6 @@ function Get-IdentityReferenceClass {
     } else {
         $samAccountName = $identityReference
     }
-
-    # FOR VERBOSE:
-    # Write-Yellow "[+] Getting Identity Reference Class for: $samAccountName"
 
     if (Get-ADUser -Filter {SamAccountName -eq $samAccountName} -ErrorAction SilentlyContinue) {
         return "user"
