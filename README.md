@@ -16,7 +16,7 @@ Start-Transcript -Path .\ADEnum.txt ; .\ADModule-Enum.ps1 ; Stop-Transcript
 ```
 
 ## Domain mapping usage
-You'll need to import the dll yourself for now (I'm lazy)
+You'll need to import the dll yourself for now (I'm lazy)  
 Load the script in memory, then execute it. You can add `-Verbose`
 ```
 . .\Get-ADMap.ps1
