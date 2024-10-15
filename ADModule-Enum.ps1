@@ -185,14 +185,7 @@ function Get-IdentityReferenceClass {
     } else {
         $samAccountName = $identityReference
     }
-
-    if (Get-ADUser -Filter {SamAccountName -eq $samAccountName} -ErrorAction SilentlyContinue) {
-        return "user"
-    } elseif (Get-ADGroup -Filter {SamAccountName -eq $samAccountName} -ErrorAction SilentlyContinue) {
-        return "group"
-    } else {
-        return "unknown"
-    }
+    return (Get-ADObject -Filter {SamAccountName -eq $samAccountName} -ErrorAction SilentlyContinue).objectClass
 }
 
 # Function to get and translate ACLs for a given AD object
@@ -219,6 +212,7 @@ function Get-TranslatedACLs {
     }
     return $translatedAcls
 }
+
 
 ########################################
 #                                      #
@@ -423,10 +417,16 @@ function Get-PasswordPolicy {
 ########################################
 
 function Get-gMSA {
-    Write-Cyan "[*] Retrieving gMSAs (Group Managed Service Accounts) Information."
+    Write-Cyan "[*] gMSAs (Group Managed Service Accounts) information."
     Write-Yellow "[*] Fetching gMSAs details from Active Directory..."
 
-    Get-ADServiceAccount -Filter * -Properties * | Select Name, DistinguishedName, SamAccountName, Enabled, PrincipalsAllowedToRetrieveManagedPassword | Format-List | Out-String | Format-Output | Write-Host
+    $gMSAs = Get-ADServiceAccount -Filter * -Properties *
+
+    if ($gMSAs.Count -eq 0) {
+        Write-Red "[-] No gMSAs found."
+    } else {
+        $gMSAs | Select Name, DistinguishedName, SamAccountName, Enabled, PrincipalsAllowedToRetrieveManagedPassword | Format-List | Out-String | Format-Output | Write-Host
+    }
 }
 
 
