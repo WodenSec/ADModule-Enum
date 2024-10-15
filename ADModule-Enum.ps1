@@ -373,6 +373,12 @@ function Get-KerberosEnumeration {
 
     Write-Green "[*] Constrained delegation information:"
     Get-ADObject -Filter {msDS-AllowedToDelegateTo -ne "$null"} -Properties * | Select DistinguishedName, sAMAccountName, ObjectClass, msDS-AllowedToDelegateTo | Format-List | Out-String | Format-Output | Write-Host
+
+    Write-Green "[*] RBCD (computers):"
+    Get-ADComputer -Filter * -Properties * | ?{$_.PrincipalsAllowedToDelegateToAccount} | Select DNSHostName,SamAccountName,PrincipalsAllowedToDelegateToAccount | FL | Out-String | Format-Output | Write-Host
+
+    Write-Green "[*] RBCD (users):"
+    Get-ADUser -Filter * -Properties * | ?{$_.PrincipalsAllowedToDelegateToAccount} | Select SamAccountName,PrincipalsAllowedToDelegateToAccount | FL | Out-String | Format-Output | Write-Host
 }
 
 ########################################
@@ -419,17 +425,21 @@ function Get-PasswordPolicy {
 function Get-gMSA {
     Write-Cyan "[*] gMSAs (Group Managed Service Accounts) information."
     Write-Yellow "[*] Fetching gMSAs details from Active Directory..."
-
-    $gMSAs = Get-ADServiceAccount -Filter * -Properties *
-
-    if ($gMSAs.Count -eq 0) {
-        Write-Red "[-] No gMSAs found."
-    } else {
-        $gMSAs | Select Name, DistinguishedName, SamAccountName, Enabled, PrincipalsAllowedToRetrieveManagedPassword | Format-List | Out-String | Format-Output | Write-Host
-    }
+    Get-ADServiceAccount -Filter * -Properties * | Select Name, DistinguishedName, SamAccountName, Enabled, PrincipalsAllowedToRetrieveManagedPassword | Format-List | Out-String | Format-Output | Write-Host
 }
 
+########################################
+#                                      #
+#                LAPS                  #
+#                                      #
+########################################
 
+function Get-LAPS {
+    Write-Cyan "[*] LAPS (Local Admin Password Solution) information."
+    Write-Yellow "[*] Trying to read LAPS passwords..."
+    Get-ADComputer -Filter * -Properties ms-MCS-AdmPwd, DistinguishedName | Where-Object { $_."ms-MCS-AdmPwd" -ne $null } | Select-Object Name, DNSHostName, ms-MCS-AdmPwd | Format-List | Out-String | Format-Output | Write-Host
+
+}
 ########################################
 #                                      #
 #           Run All Checks             #
@@ -461,8 +471,9 @@ function Show-MainMenu {
     Write-Host "5. Kerberos Enumeration"
     Write-Host "6. Password Policy"
     Write-Host "7. Retrieve gMSAs Information"
-    Write-Host "8. Run All Checks (except Targeted Enumeration)"
-    $choice = Read-Host "Enter your choice (1/2/3/4/5/6/7/8)"
+    Write-Host "8. Retrieve LAPS Information"
+    Write-Host "A. Run All Checks (except Targeted Enumeration)"
+    $choice = Read-Host "Enter your choice (1/2/3/4/5/6/7/8/A)"
     return $choice
 }
 
@@ -491,6 +502,9 @@ switch ($mainChoice) {
         Get-gMSA
     }
     8 {
+        Get-LAPS
+    }
+    "a" {
         Run-AllChecks
     }
     default {
