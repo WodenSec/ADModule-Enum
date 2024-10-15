@@ -454,6 +454,7 @@ function Run-AllChecks {
     Get-KerberosEnumeration
     Get-PasswordPolicy
     Get-gMSA
+    Get-LAPS
 }
 
 ########################################
