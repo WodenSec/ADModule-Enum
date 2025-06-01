@@ -390,30 +390,68 @@ function Get-KerberosEnumeration {
 function Get-PasswordPolicy {
     Write-Cyan "[*] Starting Password Policy Checkup."
 
+    # 1. Default Domain Policy
     Write-Green "[+] Default Domain Password Policy:"
     Get-ADDefaultDomainPasswordPolicy | Format-List | Out-String | Format-Output -AddSeparators $false | Write-Host
 
+    # 2. All existing FGPPs (from LDAP listing)
+    $fgppAll = Get-ADObject -SearchBase "CN=Password Settings Container,CN=System,$((Get-ADDomain).DistinguishedName)" `
+                            -LDAPFilter "(objectClass=*)" -Properties DistinguishedName
+
+    $fgppNames = @()
+    foreach ($fgpp in $fgppAll) {
+        if ($fgpp.DistinguishedName -match "^CN=([^,]+),") {
+            $name = $matches[1]
+            if ($name -ne "Password Settings Container") {
+                $fgppNames += $name
+            }
+        }
+    }
+
+    # 3. FGPP lisibles
     Write-Green "[+] Fine-Grained Password Policies:"
-    Get-ADFineGrainedPasswordPolicy -Filter *  | Format-List | Out-String | Format-Output | Write-Host
+    $readableFgpp = @()
+    try {
+        $readableFgpp = @(Get-ADFineGrainedPasswordPolicy -Filter * -ErrorAction Stop)
+        if ($readableFgpp.Count -eq 0) {
+            Write-Host "No readable FGPPs found." -ForegroundColor DarkGray
+        } else {
+            $readableFgpp | Format-List | Out-String | Format-Output | Write-Host
+        }
+    } catch {
+        Write-Host "Error reading FGPPs via Get-ADFineGrainedPasswordPolicy." -ForegroundColor Red
+    }
 
-    Write-Green "[+] Fine-Grained Password Policy Subjects:"
-    Get-ADFineGrainedPasswordPolicy -Filter * | ForEach-Object {
-        Write-Yellow "[*] Policy: $($_.Name)"
-        $subjects = Get-ADFineGrainedPasswordPolicySubject -Identity $_.Name | Format-List | Out-String | Format-Output -AddSeparators $false
-        Write-Host $subjects
+    # 4. Alerte sur les FGPP non lisibles
+    $readableNames = @($readableFgpp | ForEach-Object { $_.Name })
+    $hiddenFgpps = $fgppNames | Where-Object { $_ -notin $readableNames }
 
-        # Process each subject (group) to enumerate members recursively
-        $subjectObjects = Get-ADFineGrainedPasswordPolicySubject -Identity $_.Name
-        foreach ($subject in $subjectObjects) {
-            $identityClass = Get-IdentityReferenceClass -identityReference $subject.SamAccountName
+    if ($hiddenFgpps.Count -gt 0) {
+        Write-Red "[!] The following FGPPs exist but are not readable:"
+        foreach ($name in $hiddenFgpps) {
+            Write-Host "  - $name" -ForegroundColor Yellow
+        }
+    }
 
-            if ($identityClass -eq "group") {
-                Write-Yellow "[*] Enumerating members of group: $($subject.SamAccountName)"
-                Get-GroupMembersRecursive -groupDN $subject.DistinguishedName | Format-List | Out-String | Format-Output | Write-Host
+    if ($readableFgpp.Count -gt 0) {
+        Write-Green "[+] Fine-Grained Password Policy Subjects:"
+        foreach ($policy in $readableFgpp) {
+            Write-Yellow "[*] Policy: $($policy.Name)"
+            $subjects = Get-ADFineGrainedPasswordPolicySubject -Identity $policy.Name | Format-List | Out-String | Format-Output -AddSeparators $false
+            Write-Host $subjects
+
+            $subjectObjects = Get-ADFineGrainedPasswordPolicySubject -Identity $policy.Name
+            foreach ($subject in $subjectObjects) {
+                $identityClass = Get-IdentityReferenceClass -identityReference $subject.SamAccountName
+                if ($identityClass -eq "group") {
+                    Write-Yellow "[*] Enumerating members of group: $($subject.SamAccountName)"
+                    Get-GroupMembersRecursive -groupDN $subject.DistinguishedName | Format-List | Out-String | Format-Output | Write-Host
+                }
             }
         }
     }
 }
+
 
 
 ########################################
